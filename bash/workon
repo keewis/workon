@@ -1,0 +1,134 @@
+#!/usr/bin/env bash
+
+if ! which conda >/dev/null; then
+    echo "workon: cannot find conda. Please make sure conda is in your $PATH."
+    return 1
+fi
+
+if [ -z $CONDA_HOME ]; then
+    cat << EOF
+CONDA_HOME is not set. This usually indicates that 'conda activate' \
+does not work. Please run 'conda init' to fix that.
+EOF
+    return 1
+fi
+
+CONDA_ENV_PATHS=$(conda config --show envs_dirs | awk '/^  -/ {print $2}' | tr '\n' ' ')
+CONDA_WORKON_PATH_NAME=".workon_path"
+
+if [ -f ~/.config/workon/bash.sh ]; then
+    source ~/.config/workon/bash.sh
+fi
+
+_,conda-environments() {
+    find $CONDA_ENV_PATHS -maxdepth 1 -mindepth 1 -type d -name "[^.]*" | xargs basename -a
+}
+
+,workon() {
+    local env
+    if [[ "$#" -ne 1 ]]; then
+        echo "usage: ${FUNCNAME} <environment>";
+    fi
+    env="$1";
+
+    # prevent using user site dirs
+    export PYTHONNOUSERSITE=PLEASE
+    conda activate "$env"
+
+    # change to the project's directory, if set
+    ,cd-env project
+
+    return 0;
+}
+
+_,workon() {
+    local cur="${COMP_WORDS[COMP_CWORD]}";
+    local envs;
+    local prev="${COMP_WORDS[COMP_CWORD - 1]}";
+    COMPREPLY=();
+
+    if [[ "$prev" != ",workon" || "$COMP_CWORD" -ge 2 ]]; then
+        return 0
+    fi
+
+    envs="$(_,conda-environments)"
+    COMPREPLY=($(compgen -W '$envs' -- "$cur"))
+
+    return 0
+} && complete -F _,workon ,workon
+
+,deactivate() {
+    conda deactivate
+    unset PYTHONNOUSERSITE
+}
+
+,project() {
+    local environment path project
+
+    environment=$(_current_virtualenv);
+    if [[ $? -ne 0 ]]; then
+        echo "${FUNCNAME[0]}: no environment active";
+        return -1;
+    fi
+
+    path="$environment/$CONDA_WORKON_PATH_NAME"
+    if [[ "$#" -eq 1 && "$1" == "set" ]]; then
+        echo "$PWD" > "$path";
+    elif [[ "$#" -eq 1 && "$1" == "get" ]]; then
+        cat "$path";
+    else
+        echo "$0: unkown or missing argument: $1";
+        return 1;
+    fi
+
+    return 0;
+}
+
+_,project() {
+    local cur="${COMP_WORDS[COMP_CWORD]}";
+    if [[ "${COMP_CWORD}" -ge 2 ]]; then
+        COMPREPLY=();
+    else
+        COMPREPLY=($(compgen -W 'get set' -- "$cur"));
+    fi
+
+    return 0;
+} && complete -F _,project ,project
+
+,cd-env () {
+    if [[ "$(_current_virtualenv_type)" == "none" ]]; then
+        echo "no environment active";
+        return -1;
+    fi
+
+    case "$1" in
+        project)
+            local project=$(,project get);
+            if [[ -d "${project}" ]]; then
+                cd "${project}";
+            fi
+            ;;
+
+        env)
+            local env="$CONDA_PREFIX";
+            if [[ -d "${env}" ]]; then
+                cd "${env}";
+            fi
+            ;;
+        *)
+            echo "invalid args: choose one of {project,env}";
+            ;;
+    esac
+}
+
+
+_,cd-env() {
+    local cur="${COMP_WORDS[COMP_CWORD]}";
+    if [[ "${COMP_CWORD}" -ge 2 ]]; then
+        COMPREPLY=();
+    else
+        COMPREPLY=($(compgen -W 'project env' -- "$cur"));
+    fi
+
+    return 0;
+} && complete -F _,cd-env ,cd-env
