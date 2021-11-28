@@ -1,0 +1,222 @@
+#!/bin/bash
+
+VIRTUALENV_HOME=$HOME/.virtualenvs
+CONDA_HOME=$HOME/.local/opt/miniconda3
+
+# >>> conda initialize >>>
+# !! Contents within this block are managed by 'conda init' !!
+__conda_setup="$('/home/lugh/.local/opt/miniconda3/bin/conda' 'shell.bash' 'hook' 2> /dev/null)"
+if [ $? -eq 0 ]; then
+    eval "$__conda_setup"
+else
+    if [ -f "/home/lugh/.local/opt/miniconda3/etc/profile.d/conda.sh" ]; then
+        source "/home/lugh/.local/opt/miniconda3/etc/profile.d/conda.sh"
+    else
+        export PATH="/home/lugh/.local/opt/miniconda3/bin:$PATH"
+    fi
+fi
+unset __conda_setup
+# <<< conda initialize <<<
+
+
+_current_virtualenv_type() {
+    if [[ $(type -t deactivate) == "function" && "$VIRTUAL_ENV" != "" ]]; then
+        echo "venv";
+    elif [[ "$CONDA_DEFAULT_ENV" != "" && "$CONDA_PREFIX" != "" ]]; then
+        echo "conda";
+    else
+        echo "none";
+    fi;
+
+    return 0;
+}
+
+_current_virtualenv () {
+    local type=$(_current_virtualenv_type);
+    local environment_path
+
+    case "$type" in
+        venv)
+            environment_path="$VIRTUAL_ENV";
+            ;;
+        conda)
+            environment_path="$CONDA_PREFIX";
+            ;;
+        none)
+            environment_path="/none";
+            echo "${environment_path}";
+            return -1;
+            ;;
+    esac
+
+    echo "${environment_path}";
+    return 0;
+}
+
+_project_path () {
+    local env_path
+    env_path=$(_current_virtualenv);
+    if [[ $? -ne 0 ]]; then
+        return -1;
+    fi;
+
+    local _project="${env_path}/.project";
+
+    if [[ ! -f "${_project}" ]]; then
+        touch "${_project}";
+    fi
+
+    cat "${_project}";
+    return 0;
+}
+
+,workon() {
+    local type env root
+    if [[ "$#" -ne 2 ]]; then
+        echo "usage: ${FUNCNAME} <type> <environment>";
+    fi
+    type="$1";
+    env="$2";
+
+    # deactivate if we are in an environment
+    ,deactivate;
+    
+    case "$type" in
+        conda)
+            conda activate "$env";
+
+            # prevent using user site dirs
+            export PYTHONNOUSERSITE=PLEASE;
+            ;;
+
+        venv)
+            source "$VIRTUALENV_HOME/$env/bin/activate";
+            export PYTHONNOUSERSITE=PLEASE;
+            ;;
+
+        *)
+            echo "unknown type: $type. Choose one of {conda,venv}";
+            return -1;
+    esac
+
+    environment_path="$(_current_virtualenv)/environment";
+    [ -f "$environment_path" ] && source "$environment_path"
+    ,cd-env project;
+
+    return 0;
+}
+
+,deactivate() {
+    local venv_type=$(_current_virtualenv_type);
+    case "$venv_type" in
+        venv)
+            deactivate;
+            ;;
+
+        conda)
+            conda deactivate;
+            unset PYTHONNOUSERSITE;
+            ;;
+
+        none)
+            ;;
+    esac
+}
+
+,project() {
+    local environment path project
+
+    environment=$(_current_virtualenv);
+    if [[ $? -ne 0 ]]; then
+        echo "${FUNCNAME[0]}: no environment active";
+        return -1;
+    fi
+
+    path="$environment/.project"
+    if [[ "$#" -eq 1 && "$1" == "set" ]]; then
+        echo "$PWD" > "$path";
+    else
+        cat "$path";
+    fi
+
+    return 0;
+}
+
+,set-project () {
+    ,project set
+}
+
+,cd-env () {
+    if [[ "$(_current_virtualenv_type)" == "none" ]]; then
+        echo "no environment active";
+        return -1;
+    fi
+
+    case "$1" in
+        project)
+            local project=$(_project_path);
+            if [[ -d "${project}" ]]; then
+                cd "${project}";
+            fi
+            ;;
+
+        env)
+            local env=$(_current_virtualenv);
+            if [[ -d "${env}" ]]; then
+                cd "${env}";
+            fi
+            ;;
+        *)
+            echo "invalid args: choose one of {project,env}";
+            ;;
+    esac
+}
+
+_,workon() {
+    local cur="${COMP_WORDS[COMP_CWORD]}";
+    local virtualenvs;
+    local prev="${COMP_WORDS[COMP_CWORD - 1]}";
+    COMPREPLY=();
+
+    case "$prev" in
+        ,workon)
+            COMPREPLY=($(compgen -W 'conda venv' -- "$cur"));
+            ;;
+        
+        conda)
+            virtualenvs=$(
+                find $HOME/.conda/envs \
+                     -mindepth 1 \
+                     -maxdepth 1 \
+                     -type d \
+                     -not -name ".*" \
+                     -printf '%f\n'
+                );
+            COMPREPLY=($(compgen -W '$virtualenvs' -- "$cur"));
+            ;;
+
+        venv)
+            virtualenvs=$(
+                find $VIRTUALENV_HOME \
+                     -mindepth 1 \
+                     -maxdepth 1 \
+                     -type d \
+                     -not -name ".*" \
+                     -printf '%f\n'
+                );
+            COMPREPLY=($(compgen -W '$virtualenvs' -- "$cur"));
+            ;;
+    esac;
+    return 0;
+} && complete -F _,workon ,workon
+
+_,cd-env() {
+    local cur="${COMP_WORDS[COMP_CWORD]}";
+    if [[ "${COMP_CWORD}" -ge 2 ]]; then
+        COMPREPLY=();
+    else
+        COMPREPLY=($(compgen -W 'project env' -- "$cur"));
+    fi
+
+    return 0;
+} && complete -F _,cd-env ,cd-env
