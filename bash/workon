@@ -5,14 +5,6 @@ if ! which conda >/dev/null; then
     return 1
 fi
 
-if [ -z $CONDA_HOME ]; then
-    cat << EOF
-CONDA_HOME is not set. This usually indicates that 'conda activate' \
-does not work. Please run 'conda init' to fix that.
-EOF
-    return 1
-fi
-
 CONDA_ENV_PATHS=$(conda config --show envs_dirs | awk '/^  -/ {print $2}' | tr '\n' ' ')
 CONDA_WORKON_PATH_NAME=".workon_path"
 
