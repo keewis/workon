@@ -53,8 +53,8 @@ _,workon() {
 ,project() {
     local environment path project
 
-    environment=$(_current_virtualenv);
-    if [[ $? -ne 0 ]]; then
+    environment="$CONDA_PREFIX";
+    if [[ -z "$environment" ]]; then
         echo "${FUNCNAME[0]}: no environment active";
         return -1;
     fi
@@ -84,7 +84,7 @@ _,project() {
 } && complete -F _,project ,project
 
 ,cd-env () {
-    if [[ "$(_current_virtualenv_type)" == "none" ]]; then
+    if [[ -z "$CONDA_PREFIX" ]]; then
         echo "no environment active";
         return -1;
     fi
