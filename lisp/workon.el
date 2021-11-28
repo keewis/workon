@@ -46,7 +46,7 @@
   "Set the current directory as the current environment's project path."
   (interactive)
   (let ((cwd default-directory)
-        (project-path (workon-cd--project)))
+        (project-path (workon-cd--project-path)))
     (f-write-text (f-full cwd) coding-category-utf-8 project-path)))
 
 (defun workon-cd (type)
