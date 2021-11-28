@@ -8,10 +8,6 @@ fi
 CONDA_ENV_PATHS=$(conda config --show envs_dirs | awk '/^  -/ {print $2}' | tr '\n' ' ')
 CONDA_WORKON_PATH_NAME=".workon_path"
 
-if [ -f ~/.config/workon/bash.sh ]; then
-    source ~/.config/workon/bash.sh
-fi
-
 _,conda-environments() {
     find $CONDA_ENV_PATHS -maxdepth 1 -mindepth 1 -type d -name "[^.]*" | xargs basename -a
 }
