@@ -9,7 +9,13 @@ CONDA_ENV_PATHS=$(conda config --show envs_dirs | awk '/^  -/ {print $2}' | tr '
 CONDA_WORKON_PATH_NAME=".workon_path"
 
 _,conda-environments() {
-    find $CONDA_ENV_PATHS -maxdepth 1 -mindepth 1 -type d -name "[^.]*" | xargs basename -a
+    find $CONDA_ENV_PATHS \
+         -maxdepth 1 \
+         -mindepth 1 \
+         -type d \
+         -name "[^.]*" \
+         2>/dev/null \
+      | xargs basename -a
 }
 
 ,workon() {
