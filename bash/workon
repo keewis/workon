@@ -69,7 +69,9 @@ _,workon() {
     if [[ "$#" -eq 1 && "$1" == "set" ]]; then
         echo "$PWD" > "$path";
     elif [[ "$#" -eq 1 && "$1" == "get" ]]; then
-        cat "$path";
+        if [[ -f "$path" ]]; then
+            cat "$path";
+        fi
     else
         echo "$0: unkown or missing argument: $1";
         return 1;
