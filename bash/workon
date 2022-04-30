@@ -14,8 +14,9 @@ _,conda-environments() {
          -mindepth 1 \
          -type d \
          -name "[^.]*" \
+         -print0 \
          2>/dev/null \
-      | xargs basename -a
+      | while read -d "" x; do basename "$x"; done
 }
 
 ,workon() {
